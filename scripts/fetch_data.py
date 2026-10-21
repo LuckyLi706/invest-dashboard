@@ -14,7 +14,7 @@ import os
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def sina(symbol, n=260):
+def sina(symbol, n=1300):
     url = ("http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
            f"CN_MarketData.getKLineData?symbol={symbol}&scale=240&ma=no&datalen={n}")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -22,11 +22,12 @@ def sina(symbol, n=260):
     return [(r["day"], float(r["close"])) for r in d]
 
 
-def tencent_qfq(code, n=320):
+def tencent_qfq(code, n=1300):
     url = f"https://ifzq.gtimg.cn/appstock/app/newfqkline/get?param={code},day,,,{n},qfq"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    d = json.load(urllib.request.urlopen(req, timeout=25))
+    d = json.load(urllib.request.urlopen(req, timeout=30))
     node = d["data"][code]
+    # 指数无复权问题；长周期请求时接口返回 day（未复权）而非 qfqday
     arr = node.get("qfqday") or node.get("day")
     return [(r[0], float(r[2])) for r in arr]
 
