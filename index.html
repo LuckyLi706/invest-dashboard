@@ -179,12 +179,18 @@ function renderCompare(key){
   const el = document.getElementById('cmp-'+key);
   const chart = charts['cmp-'+key] || echarts.init(el);
   charts['cmp-'+key] = chart;
-  const list = GROUPS[key].map(k=>{
+  const sliced = GROUPS[key].map(k=>{
     const s = DATA.series.find(x=>x.key===k);
-    const r = sliceRange(s);
-    const base = r.c[0];
+    return { k, s, r: sliceRange(s) };
+  });
+  // 各序列长度可能不同（ETF 前复权数据较短），按日期对齐到最长的日期轴
+  const axis = sliced.reduce((a,b)=> b.r.d.length > a.length ? b.r.d : a, []);
+  const list = sliced.map(({k, s, r})=>{
+    const byDate = new Map(r.d.map((d,i)=>[d, r.c[i]]));
+    const aligned = axis.map(d=> byDate.has(d) ? byDate.get(d) : null);
+    const base = aligned.find(v=>v!=null);
     return { name:`${s.short} ${s.name}`, color:COLORS[k],
-             d:r.d, c:r.c.map(v=>+(v/base*100).toFixed(2)) };
+             d: axis, c: aligned.map(v=> v==null ? null : +(v/base*100).toFixed(2)) };
   });
   chart.setOption(lineOption(list), true);
   chart.resize();
@@ -192,8 +198,11 @@ function renderCompare(key){
 
 function renderCards(key){
   const grid = document.getElementById('grid-'+key);
-  Object.keys(charts).forEach(id=>{
-    if(id.startsWith('ch-') || id.startsWith('chg-')){ charts[id].dispose(); delete charts[id]; }
+  // 只销毁本组卡片的旧图表，不能动另一组的（否则后渲染的一组会把先渲染的销毁）
+  GROUPS[key].forEach(k=>{
+    ['ch-'+k, 'chg-'+k].forEach(id=>{
+      if(charts[id]){ charts[id].dispose(); delete charts[id]; }
+    });
   });
   grid.innerHTML = '';
   GROUPS[key].forEach(k=>{
