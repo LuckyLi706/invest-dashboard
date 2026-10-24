@@ -8,47 +8,51 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
-    --bg: #0d1220; --card: #151c30; --card2: #1a2340;
-    --text: #e8ecf5; --muted: #8b94ad; --line: #232c48;
-    --up: #f23645; --down: #25b877; --accent: #4d7cff;
+    --bg: #f4f5f7; --card: #ffffff; --card2: #f5f6f8;
+    --text: #191d23; --muted: #8a919e; --line: #e8eaee;
+    --up: #f23645; --down: #25b877; --accent: #2f6bff;
   }
   body { background: var(--bg); color: var(--text);
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-    min-height: 100vh; }
-  header { position: sticky; top: 0; z-index: 10; background: rgba(13,18,32,.92);
-    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+    min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  header { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.88);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
   .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
   .head-in { display: flex; align-items: center; justify-content: space-between;
     padding: 14px 0; flex-wrap: wrap; gap: 10px; }
-  h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
-  h1 small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 4px; }
+  h1 { font-size: 19px; font-weight: 700; letter-spacing: .5px; }
+  h1 small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 3px; }
   .tabs { display: flex; gap: 8px; }
-  .tab { border: 1px solid var(--line); background: var(--card); color: var(--muted);
-    padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 14px; transition: .2s; }
+  .tab { border: 1px solid var(--line); background: var(--card); color: #5c6470;
+    padding: 8px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; transition: .2s; }
+  .tab:hover { border-color: #c9d4ea; color: var(--accent); }
   .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  .ranges { display: flex; gap: 6px; align-items: center; }
-  .range { border: 1px solid var(--line); background: transparent; color: var(--muted);
-    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-  .range.active { background: var(--card2); color: var(--text); border-color: var(--accent); }
+  .ranges { display: flex; gap: 2px; align-items: center; background: var(--card2);
+    padding: 3px; border-radius: 999px; }
+  .range { border: none; background: transparent; color: var(--muted);
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 12px; transition: .2s; }
+  .range.active { background: #fff; color: var(--text); font-weight: 600;
+    box-shadow: 0 1px 3px rgba(16,24,40,.12); }
   main { padding: 20px 0 40px; }
   .updated { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
-  .panel-title { font-size: 16px; font-weight: 600; margin: 6px 0 12px;
+  .panel-title { font-size: 15px; font-weight: 700; margin: 6px 0 12px; letter-spacing: .3px;
     display: flex; align-items: center; gap: 8px; }
   .panel-title .dot { width: 8px; height: 8px; border-radius: 50%; }
   .compare-box, .card { background: var(--card); border: 1px solid var(--line);
-    border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    border-radius: 14px; padding: 18px; margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04); }
   .compare-box .chart { height: 320px; }
   .grid { display: flex; flex-direction: column; gap: 16px; }
   .grid .card { flex: none; max-width: none; margin-bottom: 0; }
   .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-  .card-name { font-size: 17px; font-weight: 700; }
+  .card-name { font-size: 16px; font-weight: 700; }
   .card-name .code { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
   .card-type { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .last-val { text-align: right; }
-  .last-val .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .last-val .v { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .last-val .d { font-size: 11px; color: var(--muted); }
   .stats { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
-  .stat { background: var(--card2); border-radius: 8px; padding: 6px 12px; font-size: 12px; }
+  .stat { background: var(--card2); border-radius: 8px; padding: 7px 12px; font-size: 12px; }
   .stat .k { color: var(--muted); margin-right: 6px; }
   .stat .n { font-weight: 700; font-variant-numeric: tabular-nums; }
   .up { color: var(--up); } .down { color: var(--down); }
@@ -57,7 +61,7 @@
   .card .chg-chart { height: 120px; }
   footer { color: var(--muted); font-size: 12px; line-height: 1.8; padding: 20px 0 40px;
     border-top: 1px solid var(--line); }
-  .err { background: #3a1d22; border: 1px solid var(--up); color: #ffb3ba;
+  .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
     padding: 16px; border-radius: 8px; margin: 20px 0; }
   @media (max-width: 640px) { .compare-box .chart { height: 260px; } h1 { font-size: 17px; } }
 </style>
@@ -86,7 +90,7 @@
   <div id="err"></div>
 
   <section id="sec-def">
-    <div class="panel-title"><span class="dot" style="background:#4d7cff"></span>防御板块 · 归一化对比（区间起点=100）</div>
+    <div class="panel-title"><span class="dot" style="background:#2f6bff"></span>防御板块 · 归一化对比（区间起点=100）</div>
     <div class="compare-box"><div class="chart" id="cmp-def"></div></div>
     <div class="grid" id="grid-def"></div>
   </section>
@@ -98,7 +102,7 @@
   </section>
 
   <section id="sec-yield">
-    <div class="panel-title"><span class="dot" style="background:#22d3ee"></span>长端国债收益率 · 走势（%）</div>
+    <div class="panel-title"><span class="dot" style="background:#0891b2"></span>长端国债收益率 · 走势（%）</div>
     <div class="card">
       <div class="card-head">
         <div><div class="card-name">国债收益率<span class="code">中债收益率曲线</span></div>
@@ -117,8 +121,8 @@
 </footer>
 
 <script>
-const COLORS = { bank:'#4d7cff', div:'#ff9f43', consume:'#25b877',
-                 telecom:'#b06cff', semi:'#f23645', chip:'#ffce54' };
+const COLORS = { bank:'#2f6bff', div:'#ff9f43', consume:'#25b877',
+                 telecom:'#b06cff', semi:'#f23645', chip:'#eda33a' };
 const GROUPS = {
   def: ['bank','div','consume'],
   atk: ['telecom','semi','chip']
@@ -147,17 +151,17 @@ function barOption(dates, vals){
   return {
     backgroundColor:'transparent',
     tooltip:{ trigger:'axis', axisPointer:{type:'shadow'},
-      backgroundColor:'#1a2340', borderColor:'#2c3a5e', textStyle:{color:'#e8ecf5',fontSize:12},
+      backgroundColor:'#ffffff', borderColor:'#e8eaee', textStyle:{color:'#191d23',fontSize:12}, extraCssText:'box-shadow:0 6px 20px rgba(15,23,42,.12);border-radius:8px;padding:8px 10px;',
       formatter: ps => { const p=ps[0];
         return `${p.axisValue}<br/>涨跌幅 ${p.value>0?'+':''}${p.value}%`; } },
     grid:{ left:8, right:14, top:14, bottom:8, containLabel:true },
     xAxis:{ type:'category', data:dates,
-      axisLine:{lineStyle:{color:'#232c48'}}, axisTick:{show:false},
-      axisLabel:{color:'#8b94ad',fontSize:11,
+      axisLine:{lineStyle:{color:'#e8eaee'}}, axisTick:{show:false},
+      axisLabel:{color:'#8a919e',fontSize:11,
         formatter:(v,i)=> i%Math.ceil(dates.length/6)===0 ? v.slice(5) : ''} },
     yAxis:{ type:'value',
-      splitLine:{lineStyle:{color:'#1b2340'}},
-      axisLabel:{color:'#8b94ad',fontSize:11, formatter:'{value}%'} },
+      splitLine:{lineStyle:{color:'#eef0f3'}},
+      axisLabel:{color:'#8a919e',fontSize:11, formatter:'{value}%'} },
     series:[{ type:'bar', barWidth:'60%',
       data: vals.map(v=>({ value: v==null?0:v,
         itemStyle:{ color: (v!=null && v>=0) ? '#f23645' : '#25b877' } })) }]
@@ -168,16 +172,16 @@ function lineOption(series, title){
   return {
     backgroundColor:'transparent',
     tooltip:{ trigger:'axis',
-      backgroundColor:'#1a2340', borderColor:'#2c3a5e', textStyle:{color:'#e8ecf5',fontSize:12},
+      backgroundColor:'#ffffff', borderColor:'#e8eaee', textStyle:{color:'#191d23',fontSize:12}, extraCssText:'box-shadow:0 6px 20px rgba(15,23,42,.12);border-radius:8px;padding:8px 10px;',
       valueFormatter: v => typeof v==='number'? v.toLocaleString('zh-CN',{maximumFractionDigits:2}) : v },
     grid:{ left:8, right:14, top:30, bottom:8, containLabel:true },
     xAxis:{ type:'category', data:series[0].d,
-      axisLine:{lineStyle:{color:'#232c48'}}, axisTick:{show:false},
-      axisLabel:{color:'#8b94ad',fontSize:11,
+      axisLine:{lineStyle:{color:'#e8eaee'}}, axisTick:{show:false},
+      axisLabel:{color:'#8a919e',fontSize:11,
         formatter:(v,i)=> i%Math.ceil(series[0].d.length/6)===0 ? v.slice(5) : ''} },
     yAxis:{ type:'value', scale:true,
-      splitLine:{lineStyle:{color:'#1b2340'}}, axisLabel:{color:'#8b94ad',fontSize:11} },
-    legend:{ textStyle:{color:'#8b94ad',fontSize:12}, top:0 },
+      splitLine:{lineStyle:{color:'#eef0f3'}}, axisLabel:{color:'#8a919e',fontSize:11} },
+    legend:{ textStyle:{color:'#5c6470',fontSize:12}, top:0 },
     series: series.map(s=>({
       name:s.name, type:'line', data:s.c, showSymbol:false, smooth:true,
       symbol:'circle', symbolSize:6,
@@ -258,7 +262,7 @@ function renderAll(){
   renderYield();
 }
 
-const YIELD_COLORS = { cn10y:'#22d3ee', cn30y:'#f472b6' };
+const YIELD_COLORS = { cn10y:'#0891b2', cn30y:'#db2777' };
 
 function fmtBp(v){ if(v==null) return '--';
   const c = v>0?'up':(v<0?'down':'');
