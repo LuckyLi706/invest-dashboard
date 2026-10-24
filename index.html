@@ -96,9 +96,23 @@
     <div class="compare-box"><div class="chart" id="cmp-atk"></div></div>
     <div class="grid" id="grid-atk"></div>
   </section>
+
+  <section id="sec-yield">
+    <div class="panel-title"><span class="dot" style="background:#22d3ee"></span>长端国债收益率 · 走势（%）</div>
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-name">国债收益率<span class="code">中债收益率曲线</span></div>
+        <div class="card-type">10年期 / 30年期 · 日度到期收益率</div></div>
+        <div class="last-val"><div class="v" id="yield-last">--</div>
+        <div class="d" id="yield-date"></div></div>
+      </div>
+      <div class="stats" id="yield-stats"></div>
+      <div class="chart" style="height:300px" id="ch-yield"></div>
+    </div>
+  </section>
 </main>
 <footer class="wrap">
-  数据来源：新浪财经 / 腾讯证券公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考）。<br>
+  数据来源：新浪财经 / 腾讯证券公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考）；国债收益率来自东方财富中债收益率曲线序列。<br>
   本站仅做板块趋势可视化展示，不构成任何投资建议。市场有风险，投资需谨慎。
 </footer>
 
@@ -241,6 +255,40 @@ function renderCards(key){
 function renderAll(){
   renderCompare('def'); renderCompare('atk');
   renderCards('def'); renderCards('atk');
+  renderYield();
+}
+
+const YIELD_COLORS = { cn10y:'#22d3ee', cn30y:'#f472b6' };
+
+function fmtBp(v){ if(v==null) return '--';
+  const c = v>0?'up':(v<0?'down':'');
+  return `<span class="${c}">${v>0?'+':''}${v}bp</span>`; }
+
+function renderYield(){
+  if(!DATA.yields || !DATA.yields.length) return;
+  const list = DATA.yields.map(s=>{
+    const n = rangeDays ? Math.min(rangeDays, s.dates.length) : s.dates.length;
+    return { name:`${s.short} ${s.name}`, color:YIELD_COLORS[s.key],
+             d: s.dates.slice(-n), c: s.values.slice(-n) };
+  });
+  const el = document.getElementById('ch-yield');
+  const chart = charts['yield'] || echarts.init(el);
+  charts['yield'] = chart;
+  const opt = lineOption(list);
+  opt.yAxis.axisLabel.formatter = '{value}%';
+  opt.tooltip.valueFormatter = v => typeof v==='number' ? v.toFixed(4)+'%' : v;
+  chart.setOption(opt, true);
+  chart.resize();
+  const y10 = DATA.yields.find(x=>x.key==='cn10y');
+  const y30 = DATA.yields.find(x=>x.key==='cn30y');
+  document.getElementById('yield-last').textContent =
+    `10Y ${y10.last.toFixed(2)}% · 30Y ${y30.last.toFixed(2)}%`;
+  document.getElementById('yield-date').textContent = `${y10.last_date} 收益率`;
+  const grp = (s, color) => `
+    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近1月</span><span class="n">${fmtBp(s.chg_1m_bp)}</span></div>
+    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近3月</span><span class="n">${fmtBp(s.chg_3m_bp)}</span></div>
+    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近1年</span><span class="n">${fmtBp(s.chg_1y_bp)}</span></div>`;
+  document.getElementById('yield-stats').innerHTML = grp(y10, YIELD_COLORS.cn10y) + grp(y30, YIELD_COLORS.cn30y);
 }
 
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{

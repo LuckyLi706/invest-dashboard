@@ -34,6 +34,27 @@ def tencent_qfq(code, n=1300):
     return [(r[0], float(r[2])) for r in arr]
 
 
+def treasury_yields(n=1300):
+    """中债国债收益率 10 年 / 30 年（东方财富国债收益率序列，单页上限 500 条，分页拉取）。
+    字段：EMM00166466=10 年期，EMM00166469=30 年期。返回 {dates, y10, y30}（升序）。"""
+    rows = {}
+    for page in range(1, 6):
+        url = ("https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPTA_WEB_TREASURYYIELD"
+               "&columns=SOLAR_DATE,EMM00166466,EMM00166469"
+               f"&sortColumns=SOLAR_DATE&sortTypes=-1&pageSize=500&pageNumber={page}")
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        d = json.load(urllib.request.urlopen(req, timeout=30))
+        for r in d["result"]["data"]:
+            if r["EMM00166466"] is not None and r["EMM00166469"] is not None:
+                rows[r["SOLAR_DATE"][:10]] = (float(r["EMM00166466"]), float(r["EMM00166469"]))
+        if len(rows) >= n:
+            break
+    dates = sorted(rows)[-n:]
+    return {"dates": dates,
+            "y10": [round(rows[d][0], 4) for d in dates],
+            "y30": [round(rows[d][1], 4) for d in dates]}
+
+
 def main():
     specs = [
         ("bank", "银行", "中证银行指数", "399986", "指数", lambda: sina("sz399986")),
@@ -65,6 +86,28 @@ def main():
             "count": len(pts),
         })
         print(f"{short} {name} n={len(pts)} {pts[0][0]}~{pts[-1][0]} last={last}")
+
+    yz = treasury_yields()
+    out["yields"] = []
+    for key, short, name, vals in [
+        ("cn10y", "10年国债", "中债国债收益率 · 10年期", yz["y10"]),
+        ("cn30y", "30年国债", "中债国债收益率 · 30年期", yz["y30"]),
+    ]:
+        last = vals[-1]
+
+        def chg_bp(back):
+            if len(vals) > back:
+                return round((last - vals[-1 - back]) * 100, 1)  # 收益率变动以 bp 计
+            return None
+
+        out["yields"].append({
+            "key": key, "short": short, "name": name,
+            "dates": yz["dates"], "values": vals,
+            "last": last, "last_date": yz["dates"][-1],
+            "chg_1m_bp": chg_bp(20), "chg_3m_bp": chg_bp(60), "chg_1y_bp": chg_bp(240),
+            "count": len(vals),
+        })
+        print(f"{short} n={len(vals)} {yz['dates'][0]}~{yz['dates'][-1]} last={last}%")
 
     os.makedirs(os.path.join(BASE, "data"), exist_ok=True)
     with open(os.path.join(BASE, "data", "data.json"), "w") as f:
