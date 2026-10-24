@@ -53,6 +53,8 @@
   .stat .n { font-weight: 700; font-variant-numeric: tabular-nums; }
   .up { color: var(--up); } .down { color: var(--down); }
   .card .chart { height: 240px; }
+  .chg-label { font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .card .chg-chart { height: 120px; }
   footer { color: var(--muted); font-size: 12px; line-height: 1.8; padding: 20px 0 40px;
     border-top: 1px solid var(--line); }
   .err { background: #3a1d22; border: 1px solid var(--up); color: #ffb3ba;
@@ -113,10 +115,39 @@ function fmtPct(v){ if(v==null) return '--';
   const c = v>0?'up':(v<0?'down':'');
   return `<span class="${c}">${v>0?'+':''}${v}%</span>`; }
 
+function dailyChanges(s){
+  const out = [null];
+  for(let i=1;i<s.closes.length;i++){
+    out.push(+(((s.closes[i]-s.closes[i-1])/s.closes[i-1])*100).toFixed(2));
+  }
+  return out;
+}
+
 function sliceRange(s){
-  if(!rangeDays) return {d:s.dates, c:s.closes};
+  if(!rangeDays) return {d:s.dates, c:s.closes, g:dailyChanges(s)};
   const n = Math.min(rangeDays, s.dates.length);
-  return { d: s.dates.slice(-n), c: s.closes.slice(-n) };
+  return { d: s.dates.slice(-n), c: s.closes.slice(-n), g: dailyChanges(s).slice(-n) };
+}
+
+function barOption(dates, vals){
+  return {
+    backgroundColor:'transparent',
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'},
+      backgroundColor:'#1a2340', borderColor:'#2c3a5e', textStyle:{color:'#e8ecf5',fontSize:12},
+      formatter: ps => { const p=ps[0];
+        return `${p.axisValue}<br/>涨跌幅 ${p.value>0?'+':''}${p.value}%`; } },
+    grid:{ left:8, right:14, top:14, bottom:8, containLabel:true },
+    xAxis:{ type:'category', data:dates,
+      axisLine:{lineStyle:{color:'#232c48'}}, axisTick:{show:false},
+      axisLabel:{color:'#8b94ad',fontSize:11,
+        formatter:(v,i)=> i%Math.ceil(dates.length/6)===0 ? v.slice(5) : ''} },
+    yAxis:{ type:'value',
+      splitLine:{lineStyle:{color:'#1b2340'}},
+      axisLabel:{color:'#8b94ad',fontSize:11, formatter:'{value}%'} },
+    series:[{ type:'bar', barWidth:'60%',
+      data: vals.map(v=>({ value: v==null?0:v,
+        itemStyle:{ color: (v!=null && v>=0) ? '#f23645' : '#25b877' } })) }]
+  };
 }
 
 function lineOption(series, title){
@@ -161,6 +192,9 @@ function renderCompare(key){
 
 function renderCards(key){
   const grid = document.getElementById('grid-'+key);
+  Object.keys(charts).forEach(id=>{
+    if(id.startsWith('ch-') || id.startsWith('chg-')){ charts[id].dispose(); delete charts[id]; }
+  });
   grid.innerHTML = '';
   GROUPS[key].forEach(k=>{
     const s = DATA.series.find(x=>x.key===k);
@@ -168,6 +202,7 @@ function renderCards(key){
     const card = document.createElement('div');
     card.className = 'card';
     const upCls = s.chg_1y!=null && s.chg_1y>=0 ? 'up' : 'down';
+    const todayChg = r.g[r.g.length-1];
     card.innerHTML = `
       <div class="card-head">
         <div><div class="card-name">${s.short}<span class="code">${s.code}</span></div>
@@ -176,15 +211,21 @@ function renderCards(key){
         <div class="d">${s.last_date} 收盘</div></div>
       </div>
       <div class="stats">
+        <div class="stat"><span class="k">今日</span><span class="n">${fmtPct(todayChg)}</span></div>
         <div class="stat"><span class="k">近1月</span><span class="n">${fmtPct(s.chg_1m)}</span></div>
         <div class="stat"><span class="k">近3月</span><span class="n">${fmtPct(s.chg_3m)}</span></div>
         <div class="stat"><span class="k">近1年</span><span class="n">${fmtPct(s.chg_1y)}</span></div>
       </div>
-      <div class="chart" id="ch-${k}"></div>`;
+      <div class="chart" id="ch-${k}"></div>
+      <div class="chg-label">每日涨跌幅</div>
+      <div class="chart chg-chart" id="chg-${k}"></div>`;
     grid.appendChild(card);
     const chart = echarts.init(card.querySelector('#ch-'+k));
     charts['ch-'+k] = chart;
     chart.setOption(lineOption([{name:s.name, color:COLORS[k], d:r.d, c:r.c}]), true);
+    const chgChart = echarts.init(card.querySelector('#chg-'+k));
+    charts['chg-'+k] = chgChart;
+    chgChart.setOption(barOption(r.d, r.g), true);
   });
 }
 
