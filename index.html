@@ -70,13 +70,12 @@
     border-top: 1px solid var(--line); }
   .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
     padding: 16px; border-radius: 8px; margin: 20px 0; }
-  .tabs { overflow-x: auto; scrollbar-width: none; }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { white-space: nowrap; }
-  @keyframes slideFromRight { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
-  @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
-  section.slide-r { animation: slideFromRight .22s ease; }
-  section.slide-l { animation: slideFromLeft .22s ease; }
+  /* tab 一排四等分固定，不横向滚动；切换无滑入动画（用户要求不要滑动效果） */
+  .tabs { flex: 1 1 300px; flex-wrap: nowrap; }
+  .tab { flex: 1 1 0; white-space: nowrap; text-align: center; padding: 8px 4px; font-size: 13px; }
+  .ranges { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
+  .broad-grid { grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); }
+  html, body { overflow-x: hidden; }
   @media (max-width: 640px) { .compare-box .chart { height: 260px; } h1 { font-size: 17px; } }
 </style>
 </head>
@@ -381,26 +380,17 @@ function renderYield(){
 const TAB_ORDER = ['def','atk','broad','yield'];
 const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', broad:'sec-broad', yield:'sec-yield' };
 let curTab = 'def';
-function switchTab(k, dir){
+function switchTab(k){
   if(!TAB_SECTIONS[k]) return;
-  const prev = curTab;
   curTab = k;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===k));
   TAB_ORDER.forEach(t=>{
-    const sec = document.getElementById(TAB_SECTIONS[t]);
-    const show = t===k;
-    sec.style.display = show ? '' : 'none';
-    sec.classList.remove('slide-r','slide-l');
-    if(show && prev!==k){
-      void sec.offsetWidth; // 重启动画
-      sec.classList.add(dir==='l' ? 'slide-l' : 'slide-r');
-    }
+    document.getElementById(TAB_SECTIONS[t]).style.display = t===k ? '' : 'none';
   });
   setTimeout(()=>{ Object.values(charts).forEach(c=>c.resize()); }, 60);
 }
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
-  const k = t.dataset.tab;
-  switchTab(k, TAB_ORDER.indexOf(k) >= TAB_ORDER.indexOf(curTab) ? 'r' : 'l');
+  switchTab(t.dataset.tab);
 }));
 // 注：按用户要求，不做左右滑动切换 tab，只能点顶部 tab 切换
 document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
