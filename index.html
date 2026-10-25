@@ -70,6 +70,13 @@
     border-top: 1px solid var(--line); }
   .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
     padding: 16px; border-radius: 8px; margin: 20px 0; }
+  .tabs { overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; }
+  @keyframes slideFromRight { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+  @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+  section.slide-r { animation: slideFromRight .22s ease; }
+  section.slide-l { animation: slideFromLeft .22s ease; }
   @media (max-width: 640px) { .compare-box .chart { height: 260px; } h1 { font-size: 17px; } }
 </style>
 </head>
@@ -80,6 +87,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="def">🛡 防御板块</button>
       <button class="tab" data-tab="atk">⚔ 进攻板块</button>
+      <button class="tab" data-tab="broad">📊 宽基指数</button>
     </div>
     <div class="ranges" id="ranges">
       <button class="range" data-r="22">近1月</button>
@@ -108,7 +116,7 @@
     <div class="grid" id="grid-atk"></div>
   </section>
 
-  <section id="sec-broad">
+  <section id="sec-broad" style="display:none">
     <div class="panel-title"><span class="dot" style="background:#7c5cff"></span>宽基指数 · 归一化对比（区间起点=100）</div>
     <div class="compare-box"><div class="chart" id="cmp-broad" style="height:340px"></div></div>
     <div class="broad-grid" id="grid-broad"></div>
@@ -369,14 +377,46 @@ function renderYield(){
   document.getElementById('yield-stats').innerHTML = grp(y10, YIELD_COLORS.cn10y) + grp(y30, YIELD_COLORS.cn30y);
 }
 
+const TAB_ORDER = ['def','atk','broad'];
+const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', broad:'sec-broad' };
+let curTab = 'def';
+function switchTab(k, dir){
+  if(!TAB_SECTIONS[k]) return;
+  const prev = curTab;
+  curTab = k;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===k));
+  TAB_ORDER.forEach(t=>{
+    const sec = document.getElementById(TAB_SECTIONS[t]);
+    const show = t===k;
+    sec.style.display = show ? '' : 'none';
+    sec.classList.remove('slide-r','slide-l');
+    if(show && prev!==k){
+      void sec.offsetWidth; // 重启动画
+      sec.classList.add(dir==='l' ? 'slide-l' : 'slide-r');
+    }
+  });
+  setTimeout(()=>{ Object.values(charts).forEach(c=>c.resize()); }, 60);
+}
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
   const k = t.dataset.tab;
-  document.getElementById('sec-def').style.display = k==='def'?'':'none';
-  document.getElementById('sec-atk').style.display = k==='atk'?'':'none';
-  setTimeout(()=>{ Object.values(charts).forEach(c=>c.resize()); }, 50);
+  switchTab(k, TAB_ORDER.indexOf(k) >= TAB_ORDER.indexOf(curTab) ? 'r' : 'l');
 }));
+// 左右滑动切换（触摸）：在内容区横滑超过 60px 且横向位移大于纵向时切到相邻 tab
+let swX = null, swY = null;
+const mainEl = document.querySelector('main');
+mainEl.addEventListener('touchstart', e=>{
+  const t = e.changedTouches[0]; swX = t.clientX; swY = t.clientY;
+}, { passive:true });
+mainEl.addEventListener('touchend', e=>{
+  if(swX===null) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swX, dy = t.clientY - swY;
+  swX = swY = null;
+  if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  const i = TAB_ORDER.indexOf(curTab);
+  const ni = dx < 0 ? Math.min(i+1, TAB_ORDER.length-1) : Math.max(i-1, 0);
+  if(ni !== i) switchTab(TAB_ORDER[ni], dx < 0 ? 'r' : 'l');
+}, { passive:true });
 document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.range').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
