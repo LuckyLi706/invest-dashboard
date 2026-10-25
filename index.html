@@ -402,22 +402,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   const k = t.dataset.tab;
   switchTab(k, TAB_ORDER.indexOf(k) >= TAB_ORDER.indexOf(curTab) ? 'r' : 'l');
 }));
-// 左右滑动切换（触摸）：在内容区横滑超过 60px 且横向位移大于纵向时切到相邻 tab
-let swX = null, swY = null;
-const mainEl = document.querySelector('main');
-mainEl.addEventListener('touchstart', e=>{
-  const t = e.changedTouches[0]; swX = t.clientX; swY = t.clientY;
-}, { passive:true });
-mainEl.addEventListener('touchend', e=>{
-  if(swX===null) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - swX, dy = t.clientY - swY;
-  swX = swY = null;
-  if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-  const i = TAB_ORDER.indexOf(curTab);
-  const ni = dx < 0 ? Math.min(i+1, TAB_ORDER.length-1) : Math.max(i-1, 0);
-  if(ni !== i) switchTab(TAB_ORDER[ni], dx < 0 ? 'r' : 'l');
-}, { passive:true });
+// 注：按用户要求，不做左右滑动切换 tab，只能点顶部 tab 切换
 document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.range').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
