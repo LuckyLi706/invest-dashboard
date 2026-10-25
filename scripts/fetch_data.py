@@ -1,10 +1,12 @@
-"""抓取 6 个板块标的的近一年日线收盘价，生成 data/data.json。
+"""抓取 6 个板块标的 + 14 个宽基指数的近 5 年日线收盘价，生成 data/data.json。
 
 来源：
-- 新浪财经 K 线接口：银行(399986)、消费(000932)、芯片(980017)
+- 新浪财经 K 线接口：银行(399986)、消费(000932)、芯片(980017)，以及宽基指数
+  （上证/深成/沪深300/上证50/中证500/中证1000/中证A500/创业板指/创业板50/科创50/科创100/深证100/北证50）
 - 腾讯证券 newfqkline 前复权接口：中证红利(000922，新浪该代码数据停留在 2019 年)、5G通信ETF(515050)、半导体ETF(512480)
   （两只 ETF 有份额拆分历史，新浪未复权数据会出现 -65%/-50% 的假跌幅，必须用前复权；
   腾讯前复权最多返回 640 个交易日，故两只 ETF 序列始于 2024-03，短于指数序列，前端对比图按日期对齐）
+- 中证2000(932000) 在新浪/腾讯/东财均无可用公开日线源，用华夏中证2000ETF(159531) 前复权代理（腾讯，2023-09 起）
 
 用法：python3 scripts/fetch_data.py
 """
@@ -55,6 +57,29 @@ def treasury_yields(n=1300):
             "y30": [round(rows[d][1], 4) for d in dates]}
 
 
+def make_entry(key, short, name, code, typ, pts):
+    closes = [c for _, c in pts]
+    last = closes[-1]
+
+    def chg(back):
+        if len(closes) > back:
+            base = closes[-1 - back]
+            return round((last - base) / base * 100, 2)
+        return None
+
+    print(f"{short} {name} n={len(pts)} {pts[0][0]}~{pts[-1][0]} last={last}")
+    nd = 3 if last < 10 else 2  # ETF 价格不足 1 元时保留 3 位小数，避免曲线呈台阶状
+    return {
+        "key": key, "short": short, "name": name, "code": code, "type": typ,
+        "dates": [d for d, _ in pts],
+        "closes": [round(c, nd) for _, c in pts],
+        "last": round(last, nd),
+        "last_date": pts[-1][0],
+        "chg_1m": chg(20), "chg_3m": chg(60), "chg_1y": chg(240),
+        "count": len(pts),
+    }
+
+
 def main():
     specs = [
         ("bank", "银行", "中证银行指数", "399986", "指数", lambda: sina("sz399986")),
@@ -64,28 +89,29 @@ def main():
         ("semi", "半导体", "半导体ETF", "512480", "ETF·跟踪中证全指半导体产品与设备指数", lambda: tencent_qfq("sh512480")),
         ("chip", "芯片", "国证芯片指数", "980017", "指数", lambda: sina("sz980017")),
     ]
+    broad_specs = [
+        ("sse", "上证指数", "上证综合指数", "000001", "指数", lambda: sina("sh000001")),
+        ("szcomp", "深证成指", "深证成份指数", "399001", "指数", lambda: sina("sz399001")),
+        ("csi300", "沪深300", "沪深300指数", "000300", "指数", lambda: sina("sh000300")),
+        ("sse50", "上证50", "上证50指数", "000016", "指数", lambda: sina("sh000016")),
+        ("csia500", "中证A500", "中证A500指数", "000510", "指数", lambda: sina("sh000510")),
+        ("csi500", "中证500", "中证500指数", "000905", "指数", lambda: sina("sh000905")),
+        ("csi1000", "中证1000", "中证1000指数", "000852", "指数", lambda: sina("sh000852")),
+        ("csi2000", "中证2000", "中证2000指数", "159531", "ETF·跟踪中证2000指数", lambda: tencent_qfq("sz159531")),
+        ("sz100", "深证100", "深证100指数", "399330", "指数", lambda: sina("sz399330")),
+        ("cyb", "创业板指", "创业板指数", "399006", "指数", lambda: sina("sz399006")),
+        ("cyb50", "创业板50", "创业板50指数", "399673", "指数", lambda: sina("sz399673")),
+        ("kc50", "科创50", "科创50指数", "000688", "指数", lambda: sina("sh000688")),
+        ("kc100", "科创100", "科创100指数", "000698", "指数", lambda: sina("sh000698")),
+        ("bz50", "北证50", "北证50成份指数", "899050", "指数", lambda: sina("bj899050")),
+    ]
     out = {"updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "series": []}
     for key, short, name, code, typ, fn in specs:
-        pts = fn()
-        closes = [c for _, c in pts]
-        last = closes[-1]
+        out["series"].append(make_entry(key, short, name, code, typ, fn()))
 
-        def chg(back):
-            if len(closes) > back:
-                base = closes[-1 - back]
-                return round((last - base) / base * 100, 2)
-            return None
-
-        out["series"].append({
-            "key": key, "short": short, "name": name, "code": code, "type": typ,
-            "dates": [d for d, _ in pts],
-            "closes": [round(c, 2) for _, c in pts],
-            "last": round(last, 2),
-            "last_date": pts[-1][0],
-            "chg_1m": chg(20), "chg_3m": chg(60), "chg_1y": chg(240),
-            "count": len(pts),
-        })
-        print(f"{short} {name} n={len(pts)} {pts[0][0]}~{pts[-1][0]} last={last}")
+    out["broad"] = []
+    for key, short, name, code, typ, fn in broad_specs:
+        out["broad"].append(make_entry(key, short, name, code, typ, fn()))
 
     yz = treasury_yields()
     out["yields"] = []

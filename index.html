@@ -44,6 +44,13 @@
   .compare-box .chart { height: 320px; }
   .grid { display: flex; flex-direction: column; gap: 16px; }
   .grid .card { flex: none; max-width: none; margin-bottom: 0; }
+  .broad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .broad-grid .card { margin-bottom: 0; padding: 14px 16px; }
+  .broad-grid .card-name { font-size: 14px; }
+  .broad-grid .last-val .v { font-size: 17px; }
+  .broad-grid .stats { margin: 8px 0 4px; }
+  .broad-grid .stat { padding: 5px 9px; font-size: 11px; }
+  .broad-grid .chart { height: 110px; }
   .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .card-name { font-size: 16px; font-weight: 700; }
   .card-name .code { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
@@ -101,6 +108,12 @@
     <div class="grid" id="grid-atk"></div>
   </section>
 
+  <section id="sec-broad">
+    <div class="panel-title"><span class="dot" style="background:#7c5cff"></span>宽基指数 · 归一化对比（区间起点=100）</div>
+    <div class="compare-box"><div class="chart" id="cmp-broad" style="height:340px"></div></div>
+    <div class="broad-grid" id="grid-broad"></div>
+  </section>
+
   <section id="sec-yield">
     <div class="panel-title"><span class="dot" style="background:#0891b2"></span>长端国债收益率 · 走势（%）</div>
     <div class="card">
@@ -116,7 +129,7 @@
   </section>
 </main>
 <footer class="wrap">
-  数据来源：新浪财经 / 腾讯证券公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考）；国债收益率来自东方财富中债收益率曲线序列。<br>
+  数据来源：新浪财经 / 腾讯证券公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考）；中证2000（932000）无公开日线源，以华夏中证2000ETF（159531）前复权代理；国债收益率来自东方财富中债收益率曲线序列。<br>
   本站仅做板块趋势可视化展示，不构成任何投资建议。市场有风险，投资需谨慎。
 </footer>
 
@@ -127,6 +140,9 @@ const GROUPS = {
   def: ['bank','div','consume'],
   atk: ['telecom','semi','chip']
 };
+const BROAD_COLORS = { sse:'#2f6bff', szcomp:'#f23645', csi300:'#ff9f43', sse50:'#0891b2',
+  csia500:'#7c5cff', csi500:'#25b877', csi1000:'#b06cff', csi2000:'#e15a97',
+  sz100:'#0ea5a5', cyb:'#eda33a', cyb50:'#eab308', kc50:'#db2777', kc100:'#65a30d', bz50:'#64748b' };
 let DATA = null, rangeDays = 132, charts = {};
 
 function fmtPct(v){ if(v==null) return '--';
@@ -256,9 +272,67 @@ function renderCards(key){
   });
 }
 
+function renderBroad(){
+  if(!DATA.broad || !DATA.broad.length) return;
+  // 只销毁宽基区块自己的旧图表
+  ['cmp-broad', ...DATA.broad.map(s=>'b-'+s.key)].forEach(id=>{
+    if(charts[id]){ charts[id].dispose(); delete charts[id]; }
+  });
+  // 归一化对比图：按日期对齐到最长日期轴，各序列以区间内首个可用值=100
+  const sliced = DATA.broad.map(s=>({ s, r: sliceRange(s) }));
+  const axis = sliced.reduce((a,b)=> b.r.d.length > a.length ? b.r.d : a, []);
+  const list = sliced.map(({s, r})=>{
+    const byDate = new Map(r.d.map((d,i)=>[d, r.c[i]]));
+    const aligned = axis.map(d=> byDate.has(d) ? byDate.get(d) : null);
+    const base = aligned.find(v=>v!=null);
+    return { name:`${s.short} ${s.code}`, color:BROAD_COLORS[s.key] || '#666',
+             d: axis, c: aligned.map(v=> v==null ? null : +(v/base*100).toFixed(2)) };
+  });
+  const cmpEl = document.getElementById('cmp-broad');
+  const cmp = echarts.init(cmpEl);
+  charts['cmp-broad'] = cmp;
+  const opt = lineOption(list);
+  opt.legend.type = 'scroll';
+  opt.series.forEach(x=>{ x.areaStyle = undefined; x.lineStyle.width = 1.6; });
+  cmp.setOption(opt, true);
+  // 各指数小卡：最新值 + 涨跌统计 + 迷你趋势
+  const grid = document.getElementById('grid-broad');
+  grid.innerHTML = '';
+  DATA.broad.forEach(s=>{
+    const r = sliceRange(s);
+    const g = dailyChanges(s);
+    const todayChg = g[g.length-1];
+    const upCls = s.chg_1y!=null && s.chg_1y>=0 ? 'up' : 'down';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-head">
+        <div><div class="card-name">${s.short}<span class="code">${s.code}</span></div>
+        <div class="card-type">${s.name} · ${s.type}</div></div>
+        <div class="last-val"><div class="v ${upCls}">${s.last.toLocaleString('zh-CN')}</div>
+        <div class="d">${s.last_date} 收盘</div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">今日</span><span class="n">${fmtPct(todayChg)}</span></div>
+        <div class="stat"><span class="k">近1月</span><span class="n">${fmtPct(s.chg_1m)}</span></div>
+        <div class="stat"><span class="k">近3月</span><span class="n">${fmtPct(s.chg_3m)}</span></div>
+        <div class="stat"><span class="k">近1年</span><span class="n">${fmtPct(s.chg_1y)}</span></div>
+      </div>
+      <div class="chart" id="b-${s.key}"></div>`;
+    grid.appendChild(card);
+    const ch = echarts.init(card.querySelector('#b-'+s.key));
+    charts['b-'+s.key] = ch;
+    const mo = lineOption([{name:s.name, color:BROAD_COLORS[s.key] || '#666', d:r.d, c:r.c}]);
+    mo.legend = { show:false };
+    mo.grid.top = 10;
+    ch.setOption(mo, true);
+  });
+}
+
 function renderAll(){
   renderCompare('def'); renderCompare('atk');
   renderCards('def'); renderCards('atk');
+  renderBroad();
   renderYield();
 }
 
@@ -316,7 +390,7 @@ fetch('./data/data.json')
   .then(j=>{
     DATA = j;
     document.getElementById('updated').textContent =
-      `数据更新于 ${j.updated}（交易日日线收盘快照）· 共 ${j.series.length} 个标的`;
+      `数据更新于 ${j.updated}（交易日日线收盘快照）· 板块 ${j.series.length} 个 · 宽基指数 ${(j.broad||[]).length} 个`;
     renderAll();
   })
   .catch(e=>{
