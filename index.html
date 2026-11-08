@@ -124,11 +124,11 @@
   </section>
 
   <section id="sec-yield" style="display:none">
-    <div class="panel-title"><span class="dot" style="background:#0891b2"></span>长端国债收益率 · 走势（%）</div>
+    <div class="panel-title"><span class="dot" style="background:#0891b2"></span>国债收益率 · 走势（%）</div>
     <div class="card">
       <div class="card-head">
         <div><div class="card-name">国债收益率<span class="code">中债收益率曲线</span></div>
-        <div class="card-type">10年期 / 30年期 · 日度到期收益率</div></div>
+        <div class="card-type">1年 / 3年 / 5年 / 10年 / 30年 · 日度到期收益率</div></div>
         <div class="last-val"><div class="v" id="yield-last">--</div>
         <div class="d" id="yield-date"></div></div>
       </div>
@@ -347,7 +347,7 @@ function renderAll(){
   renderYield();
 }
 
-const YIELD_COLORS = { cn10y:'#0891b2', cn30y:'#db2777' };
+const YIELD_COLORS = { cn1y:'#65a30d', cn3y:'#f59e0b', cn5y:'#7c5cff', cn10y:'#0891b2', cn30y:'#db2777' };
 
 function fmtBp(v){ if(v==null) return '--';
   const c = v>0?'up':(v<0?'down':'');
@@ -369,15 +369,17 @@ function renderYield(){
   chart.setOption(opt, true);
   chart.resize();
   const y10 = DATA.yields.find(x=>x.key==='cn10y');
-  const y30 = DATA.yields.find(x=>x.key==='cn30y');
-  document.getElementById('yield-last').textContent =
-    `10Y ${y10.last.toFixed(2)}% · 30Y ${y30.last.toFixed(2)}%`;
+  const lastEl = document.getElementById('yield-last');
+  lastEl.textContent = DATA.yields.map(s=>
+    `${s.short.replace('国债','')} ${s.last.toFixed(2)}%`).join(' · ');
+  if(DATA.yields.length > 2) lastEl.style.fontSize = '15px';
   document.getElementById('yield-date').textContent = `${y10.last_date} 收益率`;
-  const grp = (s, color) => `
-    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近1月</span><span class="n">${fmtBp(s.chg_1m_bp)}</span></div>
-    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近3月</span><span class="n">${fmtBp(s.chg_3m_bp)}</span></div>
-    <div class="stat"><span class="k" style="color:${color}">${s.short}</span><span class="k">近1年</span><span class="n">${fmtBp(s.chg_1y_bp)}</span></div>`;
-  document.getElementById('yield-stats').innerHTML = grp(y10, YIELD_COLORS.cn10y) + grp(y30, YIELD_COLORS.cn30y);
+  const grp = (s) => `
+    <div class="stat"><span class="k" style="color:${YIELD_COLORS[s.key]}">${s.short}</span><span class="n">${s.last.toFixed(2)}%</span></div>
+    <div class="stat"><span class="k">近1月</span><span class="n">${fmtBp(s.chg_1m_bp)}</span></div>
+    <div class="stat"><span class="k">近3月</span><span class="n">${fmtBp(s.chg_3m_bp)}</span></div>
+    <div class="stat"><span class="k">近1年</span><span class="n">${fmtBp(s.chg_1y_bp)}</span></div>`;
+  document.getElementById('yield-stats').innerHTML = DATA.yields.map(grp).join('');
 }
 
 const TAB_ORDER = ['def','atk','broad','yield'];

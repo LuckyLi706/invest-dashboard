@@ -57,6 +57,60 @@ def treasury_yields(n=1300):
             "y30": [round(rows[d][1], 4) for d in dates]}
 
 
+def chinabond_short(dates):
+    """中债官网历史曲线里的 1 年 / 3 年 / 5 年国债收益率（与东财 10/30 年同一中债口径，
+    2026-11-06 交叉验证：官网 10 年 1.5868 / 30 年 2.0275 与东财逐位一致）。
+    接口单次最多约 1 年，按年分块拉取后对齐到 dates（缺失日向前填充）。
+    失败返回 None，调用方回落到只有 10/30 年的旧结构。"""
+    import re
+    import time
+    import datetime as _dt
+    start = _dt.date.fromisoformat(dates[0])
+    end = _dt.date.fromisoformat(dates[-1])
+    got = {}
+    cur_end = end
+    while cur_end >= start:
+        cur_start = max(start, cur_end - _dt.timedelta(days=364))
+        url = ("https://yield.chinabond.com.cn/cbweb-pbc-web/pbc/historyQuery"
+               f"?startDate={cur_start}&endDate={cur_end}&gjqx=0&qxId=ycqx&locale=zh_CN")
+        raw = None
+        for attempt in range(3):  # 官网偶发断连，逐块重试
+            try:
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": "https://yield.chinabond.com.cn/"})
+                raw = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "replace")
+                break
+            except Exception:
+                time.sleep(3 * (attempt + 1))
+        if raw is None:
+            return None  # 任一块缺失就整组回落，避免半截数据
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", raw, re.S):
+            cells = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", c)).strip()
+                     for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
+            # 列：曲线名称, 日期, 3月, 6月, 1年, 3年, 5年, 7年, 10年, 30年
+            if len(cells) >= 10 and cells[0] == "中债国债收益率曲线":
+                try:
+                    got[cells[1]] = (float(cells[4]), float(cells[5]), float(cells[6]))
+                except ValueError:
+                    continue
+        cur_end = cur_start - _dt.timedelta(days=1)
+        time.sleep(1.5)
+    if not got or dates[-1] not in got:
+        return None
+    out = {1: [], 3: [], 5: []}
+    last = None
+    for d in dates:
+        if d in got:
+            last = got[d]
+        if last is None:  # dates 起点之前无官网数据时，用最早一条补齐
+            last = got[min(got)]
+        out[1].append(round(last[0], 4))
+        out[3].append(round(last[1], 4))
+        out[5].append(round(last[2], 4))
+    return out
+
+
 def make_entry(key, short, name, code, typ, pts):
     closes = [c for _, c in pts]
     last = closes[-1]
@@ -114,11 +168,24 @@ def main():
         out["broad"].append(make_entry(key, short, name, code, typ, fn()))
 
     yz = treasury_yields()
-    out["yields"] = []
-    for key, short, name, vals in [
+    tenor_specs = []
+    try:
+        cb = chinabond_short(yz["dates"])
+    except Exception as e:
+        cb = None
+        print(f"中债官网 1/3/5 年拉取失败，仅保留 10/30 年: {e}")
+    if cb:
+        tenor_specs += [
+            ("cn1y", "1年国债", "中债国债收益率 · 1年期", cb[1]),
+            ("cn3y", "3年国债", "中债国债收益率 · 3年期", cb[3]),
+            ("cn5y", "5年国债", "中债国债收益率 · 5年期", cb[5]),
+        ]
+    tenor_specs += [
         ("cn10y", "10年国债", "中债国债收益率 · 10年期", yz["y10"]),
         ("cn30y", "30年国债", "中债国债收益率 · 30年期", yz["y30"]),
-    ]:
+    ]
+    out["yields"] = []
+    for key, short, name, vals in tenor_specs:
         last = vals[-1]
 
         def chg_bp(back):
