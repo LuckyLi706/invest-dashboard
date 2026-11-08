@@ -42,6 +42,18 @@ def gh_read(name, args):
 
 
 def remote_data(ref=None):
+    # data.json 自 2026-11-08 起 >1MB，GitHub contents API 不再内联返回内容，
+    # 改走 raw 直读（公开仓库；ref 可为分支名或 commit sha）；MCP 方式作回落。
+    import urllib.request as _u
+    r = ref or BRANCH
+    if r.startswith("refs/heads/"):
+        r = r[len("refs/heads/"):]
+    try:
+        url = f"https://raw.githubusercontent.com/{OWNER}/{REPO}/{r}/{REL_PATH}"
+        req = _u.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        return json.loads(_u.urlopen(req, timeout=60).read().decode())
+    except Exception:
+        pass
     out = gh_read("get_file_contents", {"owner": OWNER, "repo": REPO,
                                         "path": REL_PATH,
                                         "ref": ref or f"refs/heads/{BRANCH}"})
