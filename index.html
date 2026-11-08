@@ -86,6 +86,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="def">🛡 防御板块</button>
       <button class="tab" data-tab="atk">⚔ 进攻板块</button>
+      <button class="tab" data-tab="hk">🇭🇰 港股</button>
       <button class="tab" data-tab="broad">📊 宽基指数</button>
       <button class="tab" data-tab="yield">🏦 国债收益率</button>
     </div>
@@ -117,6 +118,12 @@
     <div class="grid" id="grid-atk"></div>
   </section>
 
+  <section id="sec-hk" style="display:none">
+    <div class="panel-title"><span class="dot" style="background:#0284c7"></span>港股 · 归一化对比（区间起点=100）</div>
+    <div class="compare-box"><div class="chart" id="cmp-hk"></div></div>
+    <div class="grid" id="grid-hk"></div>
+  </section>
+
   <section id="sec-broad" style="display:none">
     <div class="panel-title"><span class="dot" style="background:#7c5cff"></span>宽基指数 · 归一化对比（区间起点=100）</div>
     <div class="compare-box"><div class="chart" id="cmp-broad" style="height:340px"></div></div>
@@ -144,10 +151,12 @@
 
 <script>
 const COLORS = { bank:'#2f6bff', div:'#ff9f43', consume:'#25b877',
-                 telecom:'#b06cff', semi:'#f23645', chip:'#eda33a' };
+                 telecom:'#b06cff', semi:'#f23645', chip:'#eda33a',
+                 hsi:'#0284c7', hstech:'#9333ea' };
 const GROUPS = {
   def: ['bank','div','consume'],
-  atk: ['telecom','semi','chip']
+  atk: ['telecom','semi','chip'],
+  hk: ['hsi','hstech']
 };
 const BROAD_COLORS = { sse:'#2f6bff', szcomp:'#f23645', csi300:'#ff9f43', sse50:'#0891b2',
   csia500:'#7c5cff', csi500:'#25b877', csi1000:'#b06cff', csi2000:'#e15a97',
@@ -341,8 +350,8 @@ function renderBroad(){
 }
 
 function renderAll(){
-  renderCompare('def'); renderCompare('atk');
-  renderCards('def'); renderCards('atk');
+  renderCompare('def'); renderCompare('atk'); renderCompare('hk');
+  renderCards('def'); renderCards('atk'); renderCards('hk');
   renderBroad();
   renderYield();
 }
@@ -382,8 +391,8 @@ function renderYield(){
   document.getElementById('yield-stats').innerHTML = DATA.yields.map(grp).join('');
 }
 
-const TAB_ORDER = ['def','atk','broad','yield'];
-const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', broad:'sec-broad', yield:'sec-yield' };
+const TAB_ORDER = ['def','atk','hk','broad','yield'];
+const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', hk:'sec-hk', broad:'sec-broad', yield:'sec-yield' };
 let curTab = 'def';
 let savedRange = null; // 进宽基 tab 前的用户区间，进宽基自动切近10年、离开时恢复
 function applyRange(days){

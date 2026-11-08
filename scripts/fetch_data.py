@@ -36,6 +36,17 @@ def tencent_qfq(code, n=1300):
     return [(r[0], float(r[2])) for r in arr]
 
 
+def tencent_day(code, n=1300):
+    """腾讯 fqkline 日线（港股指数 hkHSI / hkHSTECH 用此端点；指数无复权问题）。"""
+    url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},day,,,{n},qfq"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                "Referer": "https://gu.qq.com/"})
+    d = json.load(urllib.request.urlopen(req, timeout=30))
+    node = d["data"][code]
+    arr = node.get("qfqday") or node.get("day")
+    return [(r[0], float(r[2])) for r in arr]
+
+
 def treasury_yields(n=1300):
     """中债国债收益率 10 年 / 30 年（东方财富国债收益率序列，单页上限 500 条，分页拉取）。
     字段：EMM00166466=10 年期，EMM00166469=30 年期。返回 {dates, y10, y30}（升序）。"""
@@ -142,6 +153,8 @@ def main():
         ("telecom", "通信", "5G通信ETF", "515050", "ETF·跟踪中证5G通信主题指数", lambda: tencent_qfq("sh515050")),
         ("semi", "半导体", "半导体ETF", "512480", "ETF·跟踪中证全指半导体产品与设备指数", lambda: tencent_qfq("sh512480")),
         ("chip", "芯片", "国证芯片指数", "980017", "指数", lambda: sina("sz980017")),
+        ("hsi", "恒生指数", "Hang Seng Index", "HSI", "港股指数", lambda: tencent_day("hkHSI")),
+        ("hstech", "恒生科技", "Hang Seng TECH Index", "HSTECH", "港股指数", lambda: tencent_day("hkHSTECH")),
     ]
     broad_specs = [
         ("sse", "上证指数", "上证综合指数", "000001", "指数", lambda: sina("sh000001", 2600)),
