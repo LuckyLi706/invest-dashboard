@@ -242,8 +242,8 @@ function renderCompare(key){
   charts['cmp-'+key] = chart;
   const sliced = GROUPS[key].map(k=>{
     const s = DATA.series.find(x=>x.key===k);
-    return { k, s, r: sliceRange(s) };
-  });
+    return s ? { k, s, r: sliceRange(s) } : null;   // 数据缺失（如新旧版本缓存错位）时跳过，别整页崩
+  }).filter(Boolean);
   // 各序列长度可能不同（ETF 前复权数据较短），按日期对齐到最长的日期轴
   const axis = sliced.reduce((a,b)=> b.r.d.length > a.length ? b.r.d : a, []);
   const list = sliced.map(({k, s, r})=>{
@@ -268,6 +268,7 @@ function renderCards(key){
   grid.innerHTML = '';
   GROUPS[key].forEach(k=>{
     const s = DATA.series.find(x=>x.key===k);
+    if(!s) return;
     const r = sliceRange(s);
     const card = document.createElement('div');
     card.className = 'card';
@@ -437,7 +438,7 @@ document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
 }));
 window.addEventListener('resize', ()=>Object.values(charts).forEach(c=>c.resize()));
 
-fetch('./data/data.json')
+fetch('./data/data.json?t=' + Date.now())
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(j=>{
     DATA = j;
