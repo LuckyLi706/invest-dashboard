@@ -36,6 +36,23 @@ def tencent_qfq(code, n=1300):
     return [(r[0], float(r[2])) for r in arr]
 
 
+def yahoo_index(symbol):
+    """Yahoo Finance chart 接口：美股指数 5 年日线（^IXIC/^NDX/^DJI/^GSPC）。
+    时间戳按美东时区换算交易日；个别空值收盘跳过。"""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    ny = ZoneInfo("America/New_York")
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5y&interval=1d"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    d = json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
+    r = d["chart"]["result"][0]
+    out = []
+    for t, c in zip(r["timestamp"], r["indicators"]["quote"][0]["close"]):
+        if c:
+            out.append((datetime.fromtimestamp(t, ny).strftime("%Y-%m-%d"), float(c)))
+    return out
+
+
 def tencent_day(code, n=1300):
     """腾讯 fqkline 日线（港股指数 hkHSI / hkHSTECH 用此端点；指数无复权问题）。"""
     url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},day,,,{n},qfq"
@@ -155,6 +172,10 @@ def main():
         ("chip", "芯片", "国证芯片指数", "980017", "指数", lambda: sina("sz980017")),
         ("hsi", "恒生指数", "Hang Seng Index", "HSI", "港股指数", lambda: tencent_day("hkHSI")),
         ("hstech", "恒生科技", "Hang Seng TECH Index", "HSTECH", "港股指数", lambda: tencent_day("hkHSTECH")),
+        ("ixic", "纳斯达克", "Nasdaq Composite", "IXIC", "美股指数", lambda: yahoo_index("%5EIXIC")),
+        ("ndx", "纳斯达克100", "Nasdaq-100", "NDX", "美股指数", lambda: yahoo_index("%5ENDX")),
+        ("dji", "道琼斯", "Dow Jones Industrial Average", "DJI", "美股指数", lambda: yahoo_index("%5EDJI")),
+        ("spx", "标普500", "S&P 500 Index", "SPX", "美股指数", lambda: yahoo_index("%5EGSPC")),
     ]
     broad_specs = [
         ("sse", "上证指数", "上证综合指数", "000001", "指数", lambda: sina("sh000001", 2600)),

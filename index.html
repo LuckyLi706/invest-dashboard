@@ -87,6 +87,7 @@
       <button class="tab active" data-tab="def">🛡 防御板块</button>
       <button class="tab" data-tab="atk">⚔ 进攻板块</button>
       <button class="tab" data-tab="hk">🇭🇰 港股</button>
+      <button class="tab" data-tab="us">🇺🇸 美股</button>
       <button class="tab" data-tab="broad">📊 宽基指数</button>
       <button class="tab" data-tab="yield">🏦 国债收益率</button>
     </div>
@@ -124,6 +125,12 @@
     <div class="grid" id="grid-hk"></div>
   </section>
 
+  <section id="sec-us" style="display:none">
+    <div class="panel-title"><span class="dot" style="background:#7c3aed"></span>美股 · 归一化对比（区间起点=100）</div>
+    <div class="compare-box"><div class="chart" id="cmp-us"></div></div>
+    <div class="grid" id="grid-us"></div>
+  </section>
+
   <section id="sec-broad" style="display:none">
     <div class="panel-title"><span class="dot" style="background:#7c5cff"></span>宽基指数 · 归一化对比（区间起点=100）</div>
     <div class="compare-box"><div class="chart" id="cmp-broad" style="height:340px"></div></div>
@@ -145,18 +152,20 @@
   </section>
 </main>
 <footer class="wrap">
-  数据来源：新浪财经 / 腾讯证券公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考）；中证2000（932000）无公开日线源，以华夏中证2000ETF（159531）前复权代理；国债收益率来自东方财富中债收益率曲线序列。<br>
+  数据来源：新浪财经 / 腾讯证券 / Yahoo Finance 公开行情接口，盘后快照（ETF 为前复权口径仅作趋势参考；美股指数为美东交易日收盘）；中证2000（932000）无公开日线源，以华夏中证2000ETF（159531）前复权代理；国债收益率来自中债收益率曲线（东方财富 / 中债官网）。<br>
   本站仅做板块趋势可视化展示，不构成任何投资建议。市场有风险，投资需谨慎。
 </footer>
 
 <script>
 const COLORS = { bank:'#2f6bff', div:'#ff9f43', consume:'#25b877',
                  telecom:'#b06cff', semi:'#f23645', chip:'#eda33a',
-                 hsi:'#0284c7', hstech:'#9333ea' };
+                 hsi:'#0284c7', hstech:'#9333ea',
+                 ixic:'#7c3aed', ndx:'#db2777', dji:'#0891b2', spx:'#ea580c' };
 const GROUPS = {
   def: ['bank','div','consume'],
   atk: ['telecom','semi','chip'],
-  hk: ['hsi','hstech']
+  hk: ['hsi','hstech'],
+  us: ['ixic','ndx','dji','spx']
 };
 const BROAD_COLORS = { sse:'#2f6bff', szcomp:'#f23645', csi300:'#ff9f43', sse50:'#0891b2',
   csia500:'#7c5cff', csi500:'#25b877', csi1000:'#b06cff', csi2000:'#e15a97',
@@ -350,8 +359,8 @@ function renderBroad(){
 }
 
 function renderAll(){
-  renderCompare('def'); renderCompare('atk'); renderCompare('hk');
-  renderCards('def'); renderCards('atk'); renderCards('hk');
+  renderCompare('def'); renderCompare('atk'); renderCompare('hk'); renderCompare('us');
+  renderCards('def'); renderCards('atk'); renderCards('hk'); renderCards('us');
   renderBroad();
   renderYield();
 }
@@ -391,8 +400,8 @@ function renderYield(){
   document.getElementById('yield-stats').innerHTML = DATA.yields.map(grp).join('');
 }
 
-const TAB_ORDER = ['def','atk','hk','broad','yield'];
-const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', hk:'sec-hk', broad:'sec-broad', yield:'sec-yield' };
+const TAB_ORDER = ['def','atk','hk','us','broad','yield'];
+const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', hk:'sec-hk', us:'sec-us', broad:'sec-broad', yield:'sec-yield' };
 let curTab = 'def';
 let savedRange = null; // 进宽基 tab 前的用户区间，进宽基自动切近10年、离开时恢复
 function applyRange(days){
