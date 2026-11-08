@@ -96,6 +96,7 @@
       <button class="range" data-r="252">近1年</button>
       <button class="range" data-r="750">近3年</button>
       <button class="range" data-r="1250">近5年</button>
+      <button class="range" data-r="2500">近10年</button>
       <button class="range" data-r="0">全部</button>
     </div>
   </div>
@@ -119,7 +120,7 @@
   <section id="sec-broad" style="display:none">
     <div class="panel-title"><span class="dot" style="background:#7c5cff"></span>宽基指数 · 归一化对比（区间起点=100）</div>
     <div class="compare-box"><div class="chart" id="cmp-broad" style="height:340px"></div></div>
-    <div class="broad-grid" id="grid-broad"></div>
+    <div class="grid" id="grid-broad"></div>
   </section>
 
   <section id="sec-yield" style="display:none">
@@ -283,7 +284,7 @@ function renderCards(key){
 function renderBroad(){
   if(!DATA.broad || !DATA.broad.length) return;
   // 只销毁宽基区块自己的旧图表
-  ['cmp-broad', ...DATA.broad.map(s=>'b-'+s.key)].forEach(id=>{
+  ['cmp-broad', ...DATA.broad.flatMap(s=>['b-'+s.key, 'bchg-'+s.key])].forEach(id=>{
     if(charts[id]){ charts[id].dispose(); delete charts[id]; }
   });
   // 归一化对比图：按日期对齐到最长日期轴，各序列以区间内首个可用值=100
@@ -303,7 +304,7 @@ function renderBroad(){
   opt.legend.type = 'scroll';
   opt.series.forEach(x=>{ x.areaStyle = undefined; x.lineStyle.width = 1.6; });
   cmp.setOption(opt, true);
-  // 各指数小卡：最新值 + 涨跌统计 + 迷你趋势
+  // 各指数长条卡（与板块卡同构）：最新值 + 涨跌统计 + 走势图 + 每日涨跌幅
   const grid = document.getElementById('grid-broad');
   grid.innerHTML = '';
   DATA.broad.forEach(s=>{
@@ -326,14 +327,16 @@ function renderBroad(){
         <div class="stat"><span class="k">近3月</span><span class="n">${fmtPct(s.chg_3m)}</span></div>
         <div class="stat"><span class="k">近1年</span><span class="n">${fmtPct(s.chg_1y)}</span></div>
       </div>
-      <div class="chart" id="b-${s.key}"></div>`;
+      <div class="chart" id="b-${s.key}"></div>
+      <div class="chg-label">每日涨跌幅</div>
+      <div class="chart chg-chart" id="bchg-${s.key}"></div>`;
     grid.appendChild(card);
     const ch = echarts.init(card.querySelector('#b-'+s.key));
     charts['b-'+s.key] = ch;
-    const mo = lineOption([{name:s.name, color:BROAD_COLORS[s.key] || '#666', d:r.d, c:r.c}]);
-    mo.legend = { show:false };
-    mo.grid.top = 10;
-    ch.setOption(mo, true);
+    ch.setOption(lineOption([{name:s.name, color:BROAD_COLORS[s.key] || '#666', d:r.d, c:r.c}]), true);
+    const bchg = echarts.init(card.querySelector('#bchg-'+s.key));
+    charts['bchg-'+s.key] = bchg;
+    bchg.setOption(barOption(r.d, r.g), true);
   });
 }
 
@@ -380,6 +383,13 @@ function renderYield(){
 const TAB_ORDER = ['def','atk','broad','yield'];
 const TAB_SECTIONS = { def:'sec-def', atk:'sec-atk', broad:'sec-broad', yield:'sec-yield' };
 let curTab = 'def';
+let savedRange = null; // 进宽基 tab 前的用户区间，进宽基自动切近10年、离开时恢复
+function applyRange(days){
+  rangeDays = days;
+  document.querySelectorAll('.range').forEach(x=>
+    x.classList.toggle('active', parseInt(x.dataset.r,10)===days));
+  renderAll();
+}
 function switchTab(k){
   if(!TAB_SECTIONS[k]) return;
   curTab = k;
@@ -387,6 +397,14 @@ function switchTab(k){
   TAB_ORDER.forEach(t=>{
     document.getElementById(TAB_SECTIONS[t]).style.display = t===k ? '' : 'none';
   });
+  // 宽基指数默认看近10年（数据已扩到10年）；切回其他 tab 时恢复之前的区间
+  if(k==='broad' && rangeDays!==2500){
+    if(savedRange===null) savedRange = rangeDays;
+    applyRange(2500);
+  } else if(k!=='broad' && savedRange!==null){
+    const r0 = savedRange; savedRange = null;
+    applyRange(r0);
+  }
   setTimeout(()=>{ Object.values(charts).forEach(c=>c.resize()); }, 60);
 }
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
@@ -394,10 +412,8 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 }));
 // 注：按用户要求，不做左右滑动切换 tab，只能点顶部 tab 切换
 document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('.range').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active');
-  rangeDays = parseInt(b.dataset.r,10);
-  renderAll();
+  savedRange = null; // 用户手动选了区间，就不再自动恢复
+  applyRange(parseInt(b.dataset.r,10));
 }));
 window.addEventListener('resize', ()=>Object.values(charts).forEach(c=>c.resize()));
 
