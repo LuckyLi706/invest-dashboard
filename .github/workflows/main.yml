@@ -1,6 +1,7 @@
 name: refresh-data
 on:
   schedule:
+    - cron: '30 3 * * 1-5'   # UTC 03:30 = 北京时间工作日 11:30
     - cron: '54 8 * * 1-5'   # UTC 08:54 = 北京时间工作日 16:54
   workflow_dispatch:          # 留个手动触发，方便先试跑
 permissions:
