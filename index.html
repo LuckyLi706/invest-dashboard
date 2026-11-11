@@ -70,9 +70,10 @@
     border-top: 1px solid var(--line); }
   .err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
     padding: 16px; border-radius: 8px; margin: 20px 0; }
-  /* tab 一排四等分固定，不横向滚动；切换无滑入动画（用户要求不要滑动效果） */
-  .tabs { flex: 1 1 300px; flex-wrap: nowrap; }
-  .tab { flex: 1 1 0; white-space: nowrap; text-align: center; padding: 8px 4px; font-size: 13px; }
+  /* tab 一行自然宽，装不下可横滑（2026-11-11 改：手机屏小，等分会把标签挤没） */
+  .tabs { flex: 1 1 auto; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; max-width: 100%; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; white-space: nowrap; text-align: center; padding: 8px 12px; font-size: 13px; }
   .ranges { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
   .broad-grid { grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); }
   html, body { overflow-x: hidden; }
@@ -415,6 +416,8 @@ function switchTab(k){
   if(!TAB_SECTIONS[k]) return;
   curTab = k;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===k));
+  const at = document.querySelector('.tab.active'), tc = document.querySelector('.tabs');
+  if(at && tc) tc.scrollTo({ left: at.offsetLeft - (tc.clientWidth - at.clientWidth) / 2, behavior: 'smooth' });
   TAB_ORDER.forEach(t=>{
     document.getElementById(TAB_SECTIONS[t]).style.display = t===k ? '' : 'none';
   });
@@ -431,7 +434,20 @@ function switchTab(k){
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   switchTab(t.dataset.tab);
 }));
-// 注：按用户要求，不做左右滑动切换 tab，只能点顶部 tab 切换
+// 内容区左右滑动切换 tab（2026-11-11 应用户要求恢复）；tab 栏自身的横滑不触发切换
+let swX = null, swY = null;
+document.addEventListener('touchstart', e=>{
+  if(e.target.closest('.tabs')){ swX = null; return; }
+  const t = e.changedTouches[0]; swX = t.clientX; swY = t.clientY;
+}, {passive:true});
+document.addEventListener('touchend', e=>{
+  if(swX === null) return;
+  const t = e.changedTouches[0], dx = t.clientX - swX, dy = t.clientY - swY;
+  swX = null;
+  if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+  const i = TAB_ORDER.indexOf(curTab), n = dx < 0 ? i + 1 : i - 1;
+  if(n >= 0 && n < TAB_ORDER.length) switchTab(TAB_ORDER[n]);
+}, {passive:true});
 document.querySelectorAll('.range').forEach(b=>b.addEventListener('click',()=>{
   savedRange = null; // 用户手动选了区间，就不再自动恢复
   applyRange(parseInt(b.dataset.r,10));
