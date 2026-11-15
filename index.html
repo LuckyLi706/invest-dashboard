@@ -150,6 +150,7 @@
       <div class="stats" id="yield-stats"></div>
       <div class="chart" style="height:300px" id="ch-yield"></div>
     </div>
+    <div class="grid" id="grid-yield"></div>
   </section>
 </main>
 <footer class="wrap">
@@ -400,6 +401,75 @@ function renderYield(){
     <div class="stat"><span class="k">近3月</span><span class="n">${fmtBp(s.chg_3m_bp)}</span></div>
     <div class="stat"><span class="k">近1年</span><span class="n">${fmtBp(s.chg_1y_bp)}</span></div>`;
   document.getElementById('yield-stats').innerHTML = DATA.yields.map(grp).join('');
+  renderYieldCards();
+}
+
+function barOptionBp(dates, vals){
+  return {
+    backgroundColor:'transparent',
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'},
+      backgroundColor:'#ffffff', borderColor:'#e8eaee', textStyle:{color:'#191d23',fontSize:12}, extraCssText:'box-shadow:0 6px 20px rgba(15,23,42,.12);border-radius:8px;padding:8px 10px;',
+      formatter: ps => { const p=ps[0];
+        return `${p.axisValue}<br/>变动 ${p.value>0?'+':''}${p.value}bp`; } },
+    grid:{ left:8, right:14, top:14, bottom:8, containLabel:true },
+    xAxis:{ type:'category', data:dates,
+      axisLine:{lineStyle:{color:'#e8eaee'}}, axisTick:{show:false},
+      axisLabel:{color:'#8a919e',fontSize:11,
+        formatter:(v,i)=> i%Math.ceil(dates.length/6)===0 ? v.slice(5) : ''} },
+    yAxis:{ type:'value',
+      splitLine:{lineStyle:{color:'#eef0f3'}},
+      axisLabel:{color:'#8a919e',fontSize:11, formatter:'{value}bp'} },
+    series:[{ type:'bar', barWidth:'60%',
+      data: vals.map(v=>({ value: v==null?0:v,
+        itemStyle:{ color: (v!=null && v>=0) ? '#f23645' : '#25b877' } })) }]
+  };
+}
+
+function renderYieldCards(){
+  const grid = document.getElementById('grid-yield');
+  if(!grid) return;
+  DATA.yields.forEach(s=>{
+    ['y-'+s.key, 'ybp-'+s.key].forEach(id=>{
+      if(charts[id]){ charts[id].dispose(); delete charts[id]; }
+    });
+  });
+  grid.innerHTML = '';
+  DATA.yields.forEach(s=>{
+    const n = rangeDays ? Math.min(rangeDays, s.dates.length) : s.dates.length;
+    const d = s.dates.slice(-n), v = s.values.slice(-n);
+    const bp = [null];
+    for(let i=1;i<v.length;i++) bp.push(+((v[i]-v[i-1])*100).toFixed(1));
+    const todayBp = bp[bp.length-1];
+    const upCls = s.chg_1y_bp!=null && s.chg_1y_bp>=0 ? 'up' : 'down';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-head">
+        <div><div class="card-name">${s.short}<span class="code">中债收益率曲线</span></div>
+        <div class="card-type">${s.name} · 日度到期收益率</div></div>
+        <div class="last-val"><div class="v ${upCls}">${s.last.toFixed(2)}%</div>
+        <div class="d">${s.last_date} 收益率</div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">今日</span><span class="n">${fmtBp(todayBp)}</span></div>
+        <div class="stat"><span class="k">近1月</span><span class="n">${fmtBp(s.chg_1m_bp)}</span></div>
+        <div class="stat"><span class="k">近3月</span><span class="n">${fmtBp(s.chg_3m_bp)}</span></div>
+        <div class="stat"><span class="k">近1年</span><span class="n">${fmtBp(s.chg_1y_bp)}</span></div>
+      </div>
+      <div class="chart" id="y-${s.key}"></div>
+      <div class="chg-label">每日变动（bp）</div>
+      <div class="chart chg-chart" id="ybp-${s.key}"></div>`;
+    grid.appendChild(card);
+    const ch = echarts.init(card.querySelector('#y-'+s.key));
+    charts['y-'+s.key] = ch;
+    const opt = lineOption([{name:`${s.short} ${s.name}`, color:YIELD_COLORS[s.key], d, c:v}]);
+    opt.yAxis.axisLabel.formatter = '{value}%';
+    opt.tooltip.valueFormatter = val => typeof val==='number' ? val.toFixed(4)+'%' : val;
+    ch.setOption(opt, true);
+    const bch = echarts.init(card.querySelector('#ybp-'+s.key));
+    charts['ybp-'+s.key] = bch;
+    bch.setOption(barOptionBp(d, bp), true);
+  });
 }
 
 const TAB_ORDER = ['def','atk','hk','us','broad','yield'];
