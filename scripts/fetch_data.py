@@ -1,11 +1,13 @@
-"""抓取 6 个板块标的近 5 年 + 14 个宽基指数近 10 年日线收盘价，生成 data/data.json。
+"""抓取全部标的近 10 年日线收盘价 + 中债国债收益率近 10 年，生成 data/data.json。
 
 来源：
 - 新浪财经 K 线接口：银行(399986)、消费(000932)、芯片(980017)，以及宽基指数
   （上证/深成/沪深300/上证50/中证500/中证1000/中证A500/创业板指/创业板50/科创50/科创100/深证100/北证50）
+  （芯片 980017 新浪源始于 2019-08，为该源上限）
 - 腾讯证券 newfqkline 前复权接口：中证红利(000922，新浪该代码数据停留在 2019 年)、5G通信ETF(515050)、半导体ETF(512480)
   （两只 ETF 有份额拆分历史，新浪未复权数据会出现 -65%/-50% 的假跌幅，必须用前复权；
-  腾讯前复权最多返回 640 个交易日，故两只 ETF 序列始于 2024-03，短于指数序列，前端对比图按日期对齐）
+  腾讯单次最多返回 640 个交易日，2026-11-15 起用 end 日期分页往前拼接：ETF 拼到上市日
+  （512480 2019-06、515050 2019-10），红利指数拼满 2600 条）
 - 中证2000(932000) 在新浪/腾讯/东财均无可用公开日线源，用华夏中证2000ETF(159531) 前复权代理（腾讯，2023-09 起）
 
 用法：python3 scripts/fetch_data.py
@@ -26,23 +28,44 @@ def sina(symbol, n=1300):
     return [(r["day"], float(r["close"])) for r in d]
 
 
-def tencent_qfq(code, n=1300):
-    url = f"https://ifzq.gtimg.cn/appstock/app/newfqkline/get?param={code},day,,,{n},qfq"
+def _tencent_page(url, code):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     d = json.load(urllib.request.urlopen(req, timeout=30))
     node = d["data"][code]
     # 指数无复权问题；长周期请求时接口返回 day（未复权）而非 qfqday
-    arr = node.get("qfqday") or node.get("day")
-    return [(r[0], float(r[2])) for r in arr]
+    return node.get("qfqday") or node.get("day") or []
+
+
+def tencent_qfq(code, target=2600):
+    """腾讯 newfqkline 前复权：单次上限 640 条，用 end 日期分页往前拼接，
+    直到攒够 target 条或没有更早数据（ETF 拼到上市日为止）。各页同为
+    前复权口径（以最新日为锚），按日期去重后升序返回。"""
+    got = {}
+    end = ""
+    while len(got) < target:
+        arr = _tencent_page(
+            f"https://ifzq.gtimg.cn/appstock/app/newfqkline/get?param={code},day,,{end},640,qfq",
+            code)
+        if not arr:
+            break
+        new = 0
+        for r in arr:
+            if r[0] not in got:
+                got[r[0]] = float(r[2])
+                new += 1
+        if new <= 1:  # 只剩边界日，说明已到最早
+            break
+        end = arr[0][0]
+    return sorted(got.items())[-target:]
 
 
 def yahoo_index(symbol):
-    """Yahoo Finance chart 接口：美股指数 5 年日线（^IXIC/^NDX/^DJI/^GSPC）。
+    """Yahoo Finance chart 接口：美股指数 10 年日线（^IXIC/^NDX/^DJI/^GSPC）。
     时间戳按美东时区换算交易日；个别空值收盘跳过。"""
     from datetime import datetime
     from zoneinfo import ZoneInfo
     ny = ZoneInfo("America/New_York")
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5y&interval=1d"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=10y&interval=1d"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     d = json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
     r = d["chart"]["result"][0]
@@ -53,22 +76,55 @@ def yahoo_index(symbol):
     return out
 
 
-def tencent_day(code, n=1300):
-    """腾讯 fqkline 日线（港股指数 hkHSI / hkHSTECH 用此端点；指数无复权问题）。"""
-    url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},day,,,{n},qfq"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
-                                                "Referer": "https://gu.qq.com/"})
-    d = json.load(urllib.request.urlopen(req, timeout=30))
-    node = d["data"][code]
-    arr = node.get("qfqday") or node.get("day")
-    return [(r[0], float(r[2])) for r in arr]
+def _tencent_day_page(code, end, n=640):
+    param = f"param={code},day,,{end},{n},qfq"
+    urls = [
+        f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?{param}",
+        f"https://ifzq.gtimg.cn/appstock/app/fqkline/get?{param}",
+        f"https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get?{param}",
+    ]
+    last_err = None
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                        "Referer": "https://gu.qq.com/"})
+            d = json.load(urllib.request.urlopen(req, timeout=30))
+            node = d["data"][code]
+            arr = node.get("qfqday") or node.get("day")
+            if arr:
+                return arr
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(f"tencent_day {code} 三个主机均失败: {last_err}")
 
 
-def treasury_yields(n=1300):
+def tencent_day(code, target=2600):
+    """腾讯 fqkline 日线（港股指数 hkHSI / hkHSTECH 用此端点；指数无复权问题）。
+    web.ifzq.gtimg.cn 会被某些出口 IP 的 WAF 拦截（HTTP 501，本机 2026-11-10
+    实测），故三个同源主机依次回落；响应结构一致。单次上限约 640 条，
+    用 end 日期分页往前拼接至 target 条或无更早数据。"""
+    got = {}
+    end = ""
+    while len(got) < target:
+        arr = _tencent_day_page(code, end)
+        if not arr:
+            break
+        new = 0
+        for r in arr:
+            if r[0] not in got:
+                got[r[0]] = float(r[2])
+                new += 1
+        if new <= 1:
+            break
+        end = arr[0][0]
+    return sorted(got.items())[-target:]
+
+
+def treasury_yields(n=2600):
     """中债国债收益率 10 年 / 30 年（东方财富国债收益率序列，单页上限 500 条，分页拉取）。
     字段：EMM00166466=10 年期，EMM00166469=30 年期。返回 {dates, y10, y30}（升序）。"""
     rows = {}
-    for page in range(1, 6):
+    for page in range(1, 13):
         url = ("https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPTA_WEB_TREASURYYIELD"
                "&columns=SOLAR_DATE,EMM00166466,EMM00166469"
                f"&sortColumns=SOLAR_DATE&sortTypes=-1&pageSize=500&pageNumber={page}")
@@ -164,12 +220,12 @@ def make_entry(key, short, name, code, typ, pts):
 
 def main():
     specs = [
-        ("bank", "银行", "中证银行指数", "399986", "指数", lambda: sina("sz399986")),
+        ("bank", "银行", "中证银行指数", "399986", "指数", lambda: sina("sz399986", 2600)),
         ("div", "红利", "中证红利指数", "000922", "指数", lambda: tencent_qfq("sh000922")),
-        ("consume", "消费", "中证主要消费指数", "000932", "指数", lambda: sina("sh000932")),
+        ("consume", "消费", "中证主要消费指数", "000932", "指数", lambda: sina("sh000932", 2600)),
         ("telecom", "通信", "5G通信ETF", "515050", "ETF·跟踪中证5G通信主题指数", lambda: tencent_qfq("sh515050")),
         ("semi", "半导体", "半导体ETF", "512480", "ETF·跟踪中证全指半导体产品与设备指数", lambda: tencent_qfq("sh512480")),
-        ("chip", "芯片", "国证芯片指数", "980017", "指数", lambda: sina("sz980017")),
+        ("chip", "芯片", "国证芯片指数", "980017", "指数", lambda: sina("sz980017", 2600)),
         ("hsi", "恒生指数", "Hang Seng Index", "HSI", "港股指数", lambda: tencent_day("hkHSI")),
         ("hstech", "恒生科技", "Hang Seng TECH Index", "HSTECH", "港股指数", lambda: tencent_day("hkHSTECH")),
         ("ixic", "纳斯达克", "Nasdaq Composite", "IXIC", "美股指数", lambda: yahoo_index("%5EIXIC")),
